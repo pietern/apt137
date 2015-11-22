@@ -18,6 +18,7 @@ typedef struct {
 
   uint16_t *wedge_mean;
   uint16_t *wedge_stddev;
+  uint16_t wedge[16];
 } channel;
 
 void channel_init(channel *c);
@@ -29,5 +30,9 @@ int channel_to_pgm(channel *c, FILE *f);
 void channel_compute_wedge_stats(channel *c);
 
 int channel_find_frame_offset(channel *c);
+
+int channel_detect_telemetry(channel *c);
+
+int channel_normalize(channel *c);
 
 #endif

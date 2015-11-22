@@ -86,12 +86,6 @@ void channel_compute_wedge_stats(channel *c) {
     // Store measurements
     c->wedge_mean[i] = sum / N;
     c->wedge_stddev[i] = stddev;
-
-    // Accumulate data for at least 8 lines before
-    // asserting minimum deviation.
-    if (i < 7) {
-      continue;
-    }
   }
 }
 
@@ -101,9 +95,9 @@ int channel_find_frame_offset(channel *c) {
   uint16_t *mean = c->wedge_mean;
   uint16_t *stddev = c->wedge_stddev;
   uint16_t i;
-  uint16_t j ;
+  uint16_t j;
 
-  for (i = 0; i < height;) {
+  for (i = 0, j = 0; i < height;) {
     // Check if minimum wrt previous line (only if not first wedge)
     if (i > 0 && j > 0 && stddev[i-1] < stddev[i]) {
       // Not a minimum; reset
@@ -122,9 +116,8 @@ int channel_find_frame_offset(channel *c) {
 
     // Check for brightness increase (only if not first wedge)
     if (j > 0 && mean[i] < mean[i-8]) {
-      // No increasing brightness; reset
+      // No increasing brightness; reset j (still a minimum)
       j = 0;
-      i++;
       continue;
     }
 
@@ -132,9 +125,62 @@ int channel_find_frame_offset(channel *c) {
     i += 8;
     if (j == 8) {
       // Found 8 consecutive wedges of increasing brightness!
-      return i - 64;
+      return i-64;
     }
   }
 
   return -1;
+}
+
+int channel_detect_telemetry(channel *c) {
+  int offset;
+  int i;
+
+  channel_compute_wedge_stats(c);
+
+  offset = channel_find_frame_offset(c);
+  if (offset < 0) {
+    return -1;
+  }
+
+  for (i = 0; i < 16; i++) {
+    c->wedge[i] = c->wedge_mean[offset+i*8];
+  }
+
+  return 0;
+}
+
+int channel_normalize(channel *c) {
+  uint16_t width = CHANNEL_WORDS;
+  uint16_t height = c->size / width;
+  uint16_t low;
+  uint16_t high;
+  uint16_t i;
+  uint16_t j;
+  int32_t v;
+
+  if (c->wedge[0] == 0) {
+    abort();
+  }
+
+  // Limits
+  low = c->wedge[8]; // Wedge 9
+  high = c->wedge[7]; // Wedge 8
+
+  // Normalize every pixel
+  for (i = 0; i < height; i++) {
+    for (j = 0; j < width; j++) {
+      v = (65535 * (c->raw[i * width + j] - low)) / (high - low);
+      if (v < 0) {
+        v = 0;
+      }
+      if (v > 65535) {
+        v = 65535;
+      }
+
+      c->raw[i * width + j] = v;
+    }
+  }
+
+  return 0;
 }
