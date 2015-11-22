@@ -10,6 +10,12 @@ all: apt137
 clean:
 	rm -f $(MAIN) $(OBJS)
 
+.PHONY: dep
+dep:
+	cc -MM $(OBJS:.o=.c) > Makefile.dep
+
+include Makefile.dep
+
 $(MAIN): $(OBJS)
 	cc $(CFLAGS) -o $@ $^ $(LDFLAGS)
 
