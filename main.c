@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
 
   decoder *d = malloc(sizeof(*d));
   decoder_init(d, sample_rate);
-  decoder_read_loop(d);
+  decoder_read_loop(d, input);
 
   fclose(input);
 

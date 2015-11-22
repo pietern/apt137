@@ -40,7 +40,7 @@ void decoder_init(decoder *s, uint32_t sample_rate) {
   channel_init(&s->b);
 }
 
-static int _read(short *buf, int fd, int count) {
+static int _read(short *buf, FILE *f, int count) {
   int bytes_to_read;
   int bytes_read;
   char *byte_offset;
@@ -48,7 +48,7 @@ static int _read(short *buf, int fd, int count) {
   bytes_to_read = sizeof(buf[0]) * count;
   byte_offset = (char *) buf;
   while (bytes_to_read > 0) {
-    bytes_read = read(fd, byte_offset, bytes_to_read);
+    bytes_read = fread(byte_offset, 1, bytes_to_read, f);
     if (bytes_read < 0) {
       return -1;
     }
@@ -103,7 +103,7 @@ static void _decoder_fill_amplitude_buffer(decoder *s, int size) {
   }
 }
 
-int apt_fill_buffer(decoder *s, int fd) {
+int apt_fill_buffer(decoder *s, FILE *f) {
   int pos = s->pos & s->mask;
   int npos = s->npos & s->mask;
   int size;
@@ -122,7 +122,7 @@ int apt_fill_buffer(decoder *s, int fd) {
   // Either the whole size is read in one chunk, or in two if
   // the index wraps around.
   if (npos + size <= s->len) {
-    rv = _read(s->raw + npos, fd, size);
+    rv = _read(s->raw + npos, f, size);
     if (rv < 0) {
       return rv;
     }
@@ -130,12 +130,12 @@ int apt_fill_buffer(decoder *s, int fd) {
     int suffix_size = s->len - npos;
     int prefix_size = size - suffix_size;
 
-    rv = _read(s->raw + npos, fd, suffix_size);
+    rv = _read(s->raw + npos, f, suffix_size);
     if (rv < 0) {
       return rv;
     }
 
-    rv = _read(s->raw, fd, prefix_size);
+    rv = _read(s->raw, f, prefix_size);
     if (rv < 0) {
       return rv;
     }
@@ -256,7 +256,7 @@ void decoder_read_line(decoder *s, channel *c, int start_pos) {
   }
 }
 
-int decoder_read_loop(decoder *s) {
+int decoder_read_loop(decoder *s, FILE *f) {
   int rv;
   int i;
   int search_limit = s->sr;
@@ -275,7 +275,7 @@ int decoder_read_loop(decoder *s) {
 
   // Main read loop
   for (i = 0;; i++) {
-    rv = apt_fill_buffer(s, STDIN_FILENO);
+    rv = apt_fill_buffer(s, f);
     if (rv < 0) {
       return rv;
     }

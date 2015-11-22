@@ -38,6 +38,6 @@ typedef struct {
 
 void decoder_init(decoder *s, uint32_t sample_rate);
 
-int decoder_read_loop(decoder *s);
+int decoder_read_loop(decoder *s, FILE *f);
 
 #endif
