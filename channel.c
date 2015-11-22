@@ -6,11 +6,18 @@
 #include "channel.h"
 
 void channel_init(channel *c) {
+  int i;
+
   c->raw = NULL;
   c->size = 0;
 
-  c->wedge_mean = NULL;
-  c->wedge_stddev = NULL;
+  c->wedge_line_mean = NULL;
+  c->wedge_line_stddev = NULL;
+
+  for (i = 0; i < 16; i++) {
+    c->wedge[i] = 0;
+    c->wedge_stddev[i] = 0;
+  }
 }
 
 uint16_t *channel_alloc_line(channel *c) {
@@ -59,8 +66,8 @@ void channel_compute_wedge_stats(channel *c) {
   }
 
   // Allocate space for wedge mean and stddev
-  c->wedge_mean = calloc(height, sizeof(c->wedge_mean[0]));
-  c->wedge_stddev = calloc(height, sizeof(c->wedge_stddev[0]));
+  c->wedge_line_mean = calloc(height, sizeof(c->wedge_line_mean[0]));
+  c->wedge_line_stddev = calloc(height, sizeof(c->wedge_line_stddev[0]));
 
   for (i = 0; i < height; i++) {
     // Subtract line from accumulators
@@ -84,16 +91,16 @@ void channel_compute_wedge_stats(channel *c) {
     stddev = sqrt((sq_sum - (sum * sum) / N) / N);
 
     // Store measurements
-    c->wedge_mean[i] = sum / N;
-    c->wedge_stddev[i] = stddev;
+    c->wedge_line_mean[i] = sum / N;
+    c->wedge_line_stddev[i] = stddev;
   }
 }
 
 int channel_find_frame_offset(channel *c) {
   uint16_t width = CHANNEL_WORDS;
   uint16_t height = c->size / width;
-  uint16_t *mean = c->wedge_mean;
-  uint16_t *stddev = c->wedge_stddev;
+  uint16_t *mean = c->wedge_line_mean;
+  uint16_t *stddev = c->wedge_line_stddev;
   uint16_t i;
   uint16_t j;
 
@@ -144,7 +151,8 @@ int channel_detect_telemetry(channel *c) {
   }
 
   for (i = 0; i < 16; i++) {
-    c->wedge[i] = c->wedge_mean[offset+i*8];
+    c->wedge[i] = c->wedge_line_mean[offset+i*8];
+    c->wedge_stddev[i] = c->wedge_line_stddev[offset+i*8];
   }
 
   return 0;
@@ -164,8 +172,8 @@ int channel_normalize(channel *c) {
   }
 
   // Limits
-  low = c->wedge[8]; // Wedge 9
-  high = c->wedge[7]; // Wedge 8
+  low = c->wedge[8] - c->wedge_stddev[8]; // Wedge 9
+  high = c->wedge[7] + c->wedge_stddev[7]; // Wedge 8
 
   // Normalize every pixel
   for (i = 0; i < height; i++) {

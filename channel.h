@@ -16,9 +16,10 @@ typedef struct {
   uint16_t *raw;
   uint32_t size;
 
-  uint16_t *wedge_mean;
-  uint16_t *wedge_stddev;
+  uint16_t *wedge_line_mean;
+  uint16_t *wedge_line_stddev;
   uint16_t wedge[16];
+  uint16_t wedge_stddev[16];
 } channel;
 
 void channel_init(channel *c);
