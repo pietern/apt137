@@ -1,5 +1,5 @@
 DEFS=-D_POSIX_C_SOURCE=200809
-CFLAGS=-std=c99 -Wall -g -ggdb $(DEFS)
+CFLAGS=-std=c99 -Wall -Wextra -g -ggdb $(DEFS)
 LDFLAGS=-lm
 MAIN=apt137
 OBJS=main.o channel.o decoder.o
