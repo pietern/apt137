@@ -267,7 +267,7 @@ int8_t decoder_read_loop(decoder *s, FILE *f) {
     resp_sum += (resp) - (resp_arr[i & 0xf]);
     resp_sq_sum += (resp * resp) - (resp_arr[i & 0xf] * resp_arr[i & 0xf]);
     resp_arr[i & 0xf] = resp;
-    resp_dev = (unsigned int) sqrt((resp_sq_sum - (resp_sum * resp_sum) / 16) / 16);
+    resp_dev = sqrt((resp_sq_sum - (resp_sum * resp_sum) / 16.0f) / 16.0f);
 
     // Use detector response stddev to conclude signal lock
     if (!has_lock) {
