@@ -5,6 +5,7 @@
 #include <errno.h>
 
 #include "decoder.h"
+#include "common.h"
 
 static unsigned int npow2(unsigned int v) {
   v--;
@@ -300,12 +301,16 @@ int decoder_read_loop(decoder *s, FILE *f) {
     // Use detector response stddev to conclude signal lock
     if (!has_lock) {
       if (resp_dev < 50) {
-        fprintf(stderr, "[%s]: Acquired lock\n", pos2time(s, s->pos));
+        if (verbosity) {
+          fprintf(stderr, "[%s]: Acquired lock\n", pos2time(s, s->pos));
+        }
         has_lock = 1;
       }
     } else {
       if (resp_dev > 200) {
-        fprintf(stderr, "[%s]: Lost lock\n", pos2time(s, s->pos));
+        if (verbosity) {
+          fprintf(stderr, "[%s]: Lost lock\n", pos2time(s, s->pos));
+        }
         has_lock = 0;
       }
     }

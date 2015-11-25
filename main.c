@@ -5,6 +5,9 @@
 
 #include "decoder.h"
 #include "channel.h"
+#include "common.h"
+
+unsigned verbosity = 0;
 
 void usage(int argc, char **argv) {
   fprintf(stderr, "Usage: %s [OPTION]... [FILE]\n", argv[0]);
@@ -18,6 +21,7 @@ void usage(int argc, char **argv) {
   fprintf(stderr, "  -a FILE    write channel A to FILE\n");
   fprintf(stderr, "  -b FILE    write channel B to FILE\n");
   fprintf(stderr, "  -n         normalize image intensity\n");
+  fprintf(stderr, "  -v         verbose output\n");
   exit(1);
 }
 
@@ -47,7 +51,7 @@ int main(int argc, char **argv) {
   unsigned normalize = 0;
   int rv;
 
-  while ((c = getopt(argc, argv, "a:b:r:n")) != -1) {
+  while ((c = getopt(argc, argv, "a:b:r:nv")) != -1) {
     switch (c) {
     case -1:
       break;
@@ -62,6 +66,9 @@ int main(int argc, char **argv) {
       break;
     case 'n':
       normalize = 1;
+      break;
+    case 'v':
+      verbosity = 1;
       break;
     default:
       usage(argc, argv);
