@@ -7,7 +7,7 @@
 #include "decoder.h"
 #include "common.h"
 
-static unsigned int npow2(unsigned int v) {
+static uint32_t npow2(uint32_t v) {
   v--;
   v |= v >> 1;
   v |= v >> 2;
@@ -20,8 +20,8 @@ static unsigned int npow2(unsigned int v) {
 
 static const char *pos2time(decoder *s, uint32_t pos) {
   static char str[10];
-  int div = pos / s->sr;
-  int rem = pos % s->sr;
+  uint32_t div = pos / s->sr;
+  uint32_t rem = pos % s->sr;
   snprintf(str, sizeof(str), "%02d:%02d.%03d", div / 60, div % 60, (1000 * rem) / s->sr);
   return str;
 }
