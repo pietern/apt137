@@ -235,7 +235,7 @@ void decoder_read_line(decoder *s, channel *c, int start_pos) {
 int8_t decoder_read_loop(decoder *s, FILE *f) {
   int8_t rv;
   int8_t i;
-  uint32_t search_limit = s->sr;
+  uint32_t search_limit;
   uint32_t detect_pos;
   int32_t resp;
   int64_t resp_arr[16];
@@ -252,6 +252,12 @@ int8_t decoder_read_loop(decoder *s, FILE *f) {
     rv = apt_fill_buffer(s, f);
     if (rv < 0) {
       return rv;
+    }
+
+    if (has_lock) {
+      search_limit = (SYNC_WORDS * s->sr) / WORD_FREQ;
+    } else {
+      search_limit = (2 * (SYNC_WORDS + CHANNEL_WORDS) * s->sr) / WORD_FREQ;
     }
 
     // Run synchronization pulse detector
@@ -278,12 +284,6 @@ int8_t decoder_read_loop(decoder *s, FILE *f) {
         }
         has_lock = 0;
       }
-    }
-
-    if (has_lock) {
-      search_limit = (SYNC_WORDS * s->sr) / WORD_FREQ;
-    } else {
-      search_limit = (2 * (SYNC_WORDS + CHANNEL_WORDS) * s->sr) / WORD_FREQ;
     }
 
     s->pos = detect_pos;
