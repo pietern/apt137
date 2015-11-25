@@ -197,7 +197,7 @@ int decoder_find_sync(decoder *s, int search_length, int *max_response_dst) {
     // Compute sync detector response
     int sync_base = pos - sync_window - 1;
     int sync_pos;
-    int sync_response;
+    int sync_response = 0;
     for (j = 0; j < 7; j++) {
       int k = 0;
       int d;
