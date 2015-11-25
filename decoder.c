@@ -42,7 +42,12 @@ void decoder_init(decoder *s, uint32_t sample_rate) {
   s->raw = calloc(s->len, sizeof(s->raw[0]));
   s->ampl = calloc(s->len, sizeof(s->ampl[0]));
   s->msum = calloc(s->len, sizeof(s->msum[0]));
-  s->mavg = calloc(s->len, sizeof(s->mavg[0]));
+
+  // Single synchronization pulse at 1040Hz
+  s->sync_pulse = (s->sr) / SYNC_PULSE_FREQ;
+
+  // Synchronization signal (channel A) is 7 cycles at 1040Hz
+  s->sync_window = (7 * s->sr) / SYNC_PULSE_FREQ;
 
   // Initialize channels
   channel_init(&s->a);
@@ -112,6 +117,18 @@ static void _decoder_fill_amplitude_buffer(decoder *s, int size) {
   }
 }
 
+static void _decoder_fill_moving_sum_buffer(decoder *s, uint32_t size) {
+  uint32_t npos = s->npos;
+  uint32_t epos = s->npos + size;
+
+  for (; npos < epos; npos++) {
+    s->msum[npos & s->mask] =
+      s->msum[(npos - 1) & s->mask]
+        - s->ampl[(npos - s->sync_window) & s->mask]
+        + s->ampl[npos & s->mask];
+  }
+}
+
 int apt_fill_buffer(decoder *s, FILE *f) {
   int pos = s->pos & s->mask;
   int npos = s->npos & s->mask;
@@ -152,78 +169,52 @@ int apt_fill_buffer(decoder *s, FILE *f) {
 
   _decoder_fill_amplitude_buffer(s, size);
 
+  _decoder_fill_moving_sum_buffer(s, size);
+
   s->npos += size;
 
   return size;
 }
 
-int decoder_find_sync(decoder *s, int search_length, int *max_response_dst) {
-  int sync_window; // Window size for pulse train
-  int sync_pulse; // Number of samples in single cycle
-  int pos;
-  unsigned short avg;
-  int i;
-  int j;
-
-  // Synchronization signal (channel A) is 7 cycles at 1040Hz
-  sync_window = (7 * s->sr) / SYNC_PULSE_FREQ;
-
-  // Single synchronization pulse at 1040Hz
-  sync_pulse = (s->sr) / SYNC_PULSE_FREQ;
-
-  // Initialize msum at s->pos-1 so it can be
-  // iteratively computed starting from s->pos.
-  pos = s->pos-1;
-  s->msum[pos & s->mask] = 0;
-  for (i = sync_window-1; i >= 0; i--) {
-    s->msum[pos & s->mask] += s->ampl[(pos - i) & s->mask];
-  }
+uint32_t decoder_find_sync(decoder *s, int32_t search_length, int32_t *max_response_dst) {
+  uint32_t pos = s->pos;
+  uint32_t epos = s->pos + search_length;
+  uint16_t avg;
+  uint32_t max_pos = 0;
+  int32_t max_response = INT32_MIN;
 
   // Search for best response from sync pulse detector
-  int max_pos = 0;
-  int max_response = INT32_MIN;
-  for (i = 0; i < search_length; i++) {
-    pos = s->pos + i;
+  for (; pos < epos; pos++) {
+    uint32_t sync_base = pos - s->sync_window - 1;
+    uint32_t sync_pos;
+    int32_t sync_response = 0;
+    uint8_t j;
+    uint8_t k;
 
-    // Compute sum
-    s->msum[pos & s->mask] =
-      s->msum[(pos - 1) & s->mask]
-      - s->ampl[(pos - sync_window) & s->mask] // Subtract sample
-      + s->ampl[pos & s->mask];                // Add sample
-
-    // Compute average
-    avg = s->msum[pos & s->mask] / sync_window;
+    avg = s->msum[pos & s->mask] / s->sync_window;
 
     // Compute sync detector response
-    int sync_base = pos - sync_window - 1;
-    int sync_pos;
-    int sync_response = 0;
     for (j = 0; j < 7; j++) {
-      int k = 0;
-      int d;
-
       sync_pos = sync_base + (j * s->sr) / SYNC_PULSE_FREQ;
 
       // High side of pulse
-      for (; k < (sync_pulse / 2); k++) {
-        d = s->ampl[(sync_pos + k) & s->mask] - avg;
-        sync_response += d;
+      for (k = 0; k < (s->sync_pulse / 2); k++) {
+        sync_response += s->ampl[(sync_pos + k) & s->mask] - avg;
       }
 
       // Skip sample if we have an odd number of samples per pulse
-      if (sync_pulse & 1) {
+      if (s->sync_pulse & 1) {
         k++;
       }
 
       // Low side of pulse
-      for (; k < sync_pulse; k++) {
-        d = s->ampl[(sync_pos + k) & s->mask] - avg;
-        sync_response -= d;
+      for (; k < s->sync_pulse; k++) {
+        sync_response -= s->ampl[(sync_pos + k) & s->mask] - avg;
       }
     }
 
     // Normalize sync detector response
-    sync_response /= (14 * (sync_pulse & ~0x1));
+    sync_response /= (14 * (s->sync_pulse & ~0x1));
     if (sync_response > max_response) {
       max_response = sync_response;
       max_pos = pos;
@@ -268,13 +259,13 @@ void decoder_read_line(decoder *s, channel *c, int start_pos) {
 int decoder_read_loop(decoder *s, FILE *f) {
   int rv;
   int i;
-  int search_limit = s->sr;
-  int detect_pos;
-  int resp;
-  int resp_arr[16];
-  int resp_sum = 0;
-  int resp_sq_sum = 0;
-  unsigned int resp_dev;
+  uint32_t search_limit = s->sr;
+  uint32_t detect_pos;
+  int32_t resp;
+  int64_t resp_arr[16];
+  int64_t resp_sum = 0;
+  int64_t resp_sq_sum = 0;
+  int16_t resp_dev;
   unsigned has_lock = 0;
 
   // Initialize array with detector responses

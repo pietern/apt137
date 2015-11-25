@@ -30,7 +30,12 @@ typedef struct {
   int16_t *raw; // Raw samples
   uint16_t *ampl; // Instantaneous amplitude
   uint32_t *msum; // Moving sum
-  uint16_t *mavg; // Moving avg
+
+  // Number of samples in single synchronization pulse
+  uint16_t sync_pulse;
+
+  // Number of samples in synchronization signal
+  uint16_t sync_window;
 
   channel a;
   channel b;
