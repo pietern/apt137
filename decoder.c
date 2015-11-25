@@ -172,7 +172,7 @@ int decoder_find_sync(decoder *s, int search_length, int *max_response_dst) {
 
   // Search for best response from sync pulse detector
   int max_pos = 0;
-  int max_response = 0;
+  int max_response = INT32_MIN;
   for (i = 0; i < search_length; i++) {
     pos = s->pos + i;
 
@@ -188,7 +188,7 @@ int decoder_find_sync(decoder *s, int search_length, int *max_response_dst) {
     // Compute sync detector response
     int sync_base = pos - sync_window - 1;
     int sync_pos;
-    int sync_response = 0;
+    int sync_response;
     for (j = 0; j < 7; j++) {
       int k = 0;
       int d;
