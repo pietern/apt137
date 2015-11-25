@@ -174,16 +174,16 @@ int decoder_find_sync(decoder *s, int search_length, int *max_response_dst) {
   int max_pos = 0;
   int max_response = 0;
   for (i = 0; i < search_length; i++) {
-    pos = (s->pos + i) & s->mask;
+    pos = s->pos + i;
 
     // Compute sum
-    s->msum[pos] =
+    s->msum[pos & s->mask] =
       s->msum[(pos - 1) & s->mask]
       - s->ampl[(pos - sync_window) & s->mask] // Subtract sample
-      + s->ampl[pos];                          // Add sample
+      + s->ampl[pos & s->mask];                // Add sample
 
     // Compute average
-    avg = s->msum[pos] / sync_window;
+    avg = s->msum[pos & s->mask] / sync_window;
 
     // Compute sync detector response
     int sync_base = pos - sync_window - 1;
