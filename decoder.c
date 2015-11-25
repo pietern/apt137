@@ -17,6 +17,14 @@ static unsigned int npow2(unsigned int v) {
   return v;
 }
 
+static const char *pos2time(decoder *s, uint32_t pos) {
+  static char str[10];
+  int div = pos / s->sr;
+  int rem = pos % s->sr;
+  snprintf(str, sizeof(str), "%02d:%02d.%03d", div / 60, div % 60, (1000 * rem) / s->sr);
+  return str;
+}
+
 void decoder_init(decoder *s, uint32_t sample_rate) {
   s->sr = sample_rate;
 
@@ -292,12 +300,12 @@ int decoder_read_loop(decoder *s, FILE *f) {
     // Use detector response stddev to conclude signal lock
     if (!has_lock) {
       if (resp_dev < 50) {
-        fprintf(stderr, "Acquired lock on line %d\n", i);
+        fprintf(stderr, "[%s]: Acquired lock\n", pos2time(s, s->pos));
         has_lock = 1;
       }
     } else {
       if (resp_dev > 200) {
-        fprintf(stderr, "Lost lock on line %d\n", i);
+        fprintf(stderr, "[%s]: Lost lock\n", pos2time(s, s->pos));
         has_lock = 0;
       }
     }
