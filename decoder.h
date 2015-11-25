@@ -15,7 +15,7 @@
 
 typedef struct {
   // Sample rate.
-  int sr;
+  uint16_t sr;
 
   // Cosine/sine of carrier phase difference between two
   // samples given the sample rate above.
@@ -41,8 +41,8 @@ typedef struct {
   channel b;
 } decoder;
 
-void decoder_init(decoder *s, uint32_t sample_rate);
+void decoder_init(decoder *s, uint16_t sample_rate);
 
-int decoder_read_loop(decoder *s, FILE *f);
+int8_t decoder_read_loop(decoder *s, FILE *f);
 
 #endif

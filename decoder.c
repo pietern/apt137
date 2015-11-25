@@ -3,6 +3,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <errno.h>
+#include <string.h>
 
 #include "decoder.h"
 #include "common.h"
@@ -26,7 +27,7 @@ static const char *pos2time(decoder *s, uint32_t pos) {
   return str;
 }
 
-void decoder_init(decoder *s, uint32_t sample_rate) {
+void decoder_init(decoder *s, uint16_t sample_rate) {
   s->sr = sample_rate;
 
   // Initialize static, sample rate dependant variables
@@ -52,31 +53,6 @@ void decoder_init(decoder *s, uint32_t sample_rate) {
   // Initialize channels
   channel_init(&s->a);
   channel_init(&s->b);
-}
-
-static int _read(short *buf, FILE *f, int count) {
-  int bytes_to_read;
-  int bytes_read;
-  char *byte_offset;
-
-  bytes_to_read = sizeof(buf[0]) * count;
-  byte_offset = (char *) buf;
-  while (bytes_to_read > 0) {
-    bytes_read = fread(byte_offset, 1, bytes_to_read, f);
-    if (bytes_read < 0) {
-      return -1;
-    }
-
-    if (bytes_read == 0) {
-      errno = 0;
-      return -1;
-    }
-
-    bytes_to_read -= bytes_read;
-    byte_offset += bytes_read;
-  }
-
-  return 0;
 }
 
 // The signal is amplitude-modulated on a 2.4KHz carrier.
@@ -129,11 +105,11 @@ static void _decoder_fill_moving_sum_buffer(decoder *s, uint32_t size) {
   }
 }
 
-int apt_fill_buffer(decoder *s, FILE *f) {
-  int pos = s->pos & s->mask;
-  int npos = s->npos & s->mask;
-  int size;
-  int rv;
+int8_t apt_fill_buffer(decoder *s, FILE *f) {
+  uint32_t pos = s->pos & s->mask;
+  uint32_t npos = s->npos & s->mask;
+  uint32_t size;
+  size_t rv;
 
   if (npos < pos) {
     size = pos - npos;
@@ -141,29 +117,29 @@ int apt_fill_buffer(decoder *s, FILE *f) {
     size = (s->len - npos) + pos;
   }
 
-  // Always keep 1 sample in history for accurate
-  // instantaneous amplitude computation.
-  size--;
+  // Keep 'sync_window' samples in the history so that
+  // the sync detector can look back far enough.
+  size -= s->sync_window;
 
   // Either the whole size is read in one chunk, or in two if
   // the index wraps around.
   if (npos + size <= s->len) {
-    rv = _read(s->raw + npos, f, size);
-    if (rv < 0) {
-      return rv;
+    rv = fread(s->raw + npos, sizeof(s->raw[0]), size, f);
+    if (rv < size) {
+      return -1;
     }
   } else {
-    int suffix_size = s->len - npos;
-    int prefix_size = size - suffix_size;
+    uint32_t suffix_size = s->len - npos;
+    uint32_t prefix_size = size - suffix_size;
 
-    rv = _read(s->raw + npos, f, suffix_size);
-    if (rv < 0) {
-      return rv;
+    rv = fread(s->raw + npos, sizeof(s->raw[0]), suffix_size, f);
+    if (rv < suffix_size) {
+      return -1;
     }
 
-    rv = _read(s->raw, f, prefix_size);
-    if (rv < 0) {
-      return rv;
+    rv = fread(s->raw, sizeof(s->raw[0]), prefix_size, f);
+    if (rv < prefix_size) {
+      return -1;
     }
   }
 
@@ -173,7 +149,7 @@ int apt_fill_buffer(decoder *s, FILE *f) {
 
   s->npos += size;
 
-  return size;
+  return 0;
 }
 
 uint32_t decoder_find_sync(decoder *s, int32_t search_length, int32_t *max_response_dst) {
@@ -256,9 +232,9 @@ void decoder_read_line(decoder *s, channel *c, int start_pos) {
   }
 }
 
-int decoder_read_loop(decoder *s, FILE *f) {
-  int rv;
-  int i;
+int8_t decoder_read_loop(decoder *s, FILE *f) {
+  int8_t rv;
+  int8_t i;
   uint32_t search_limit = s->sr;
   uint32_t detect_pos;
   int32_t resp;
@@ -269,9 +245,7 @@ int decoder_read_loop(decoder *s, FILE *f) {
   unsigned has_lock = 0;
 
   // Initialize array with detector responses
-  for (i = 0; i < 16; i++) {
-    resp_arr[i] = 0;
-  }
+  memset(resp_arr, 0, sizeof(resp_arr));
 
   // Main read loop
   for (i = 0;; i++) {
