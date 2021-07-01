@@ -43,7 +43,7 @@ void write_channel(channel *c, unsigned normalize, const char *path) {
 }
 
 int main(int argc, char **argv) {
-  char c;
+  int c;
   FILE *input = NULL;
   char *ca_file = NULL;
   char *cb_file = NULL;
@@ -53,8 +53,6 @@ int main(int argc, char **argv) {
 
   while ((c = getopt(argc, argv, "a:b:r:nv")) != -1) {
     switch (c) {
-    case -1:
-      break;
     case 'a':
       ca_file = strdup(optarg);
       break;
